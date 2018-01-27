@@ -1,0 +1,76 @@
+version: '3'
+
+services:
+  zookeeper:
+    image: igrytsyk/zookeeper-kafka_1.0.0
+    container_name: zookeeper
+    environment:
+      ZK_PORT: 2181
+    ports:
+      - 2181:2181
+    extra_hosts:
+      - moby:127.0.0.1
+    networks:
+      kafka-cluster-net:
+        ipv4_address: 10.5.0.5
+
+  broker-1:
+    image: igrytsyk/broker:003
+    container_name: broker-1
+    environment:
+      ZK_URL: 10.5.0.5:2181      # zookeeper url
+      BROKER_ID: 0               # different for each broker
+      BROKER_PORT: 9092
+      ADV_HOST: broker-1
+      NUM_PARTITIONS: 4
+    ports:
+      - 9092:9092
+    depends_on:
+      - zookeeper
+    networks:
+      kafka-cluster-net:
+        ipv4_address: 10.5.0.6
+
+  broker-2:
+    image: igrytsyk/broker:003
+    container_name: broker-2
+    environment:
+      ZK_URL: 10.5.0.5:2181      # zookeeper url
+      BROKER_ID: 1               # different for each broker
+      BROKER_PORT: 9093
+      ADV_HOST: broker-2
+      NUM_PARTITIONS: 4
+    ports:
+      - 9093:9093
+    depends_on:
+      - zookeeper
+    networks:
+      kafka-cluster-net:
+        ipv4_address: 10.5.0.7
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:4.0.0
+    container_name: schema-registry
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: 10.5.0.5:2181      # zookeeper url
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_HOST_NAME: 10.5.0.5                           # zookeeper ip
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS : PLAINTEXT://broker-1:9092,PLAINTEXT://broker-2:9093
+    ports:
+      - 8081:8081
+    extra_hosts:
+      - moby:127.0.0.1
+    depends_on:
+     - zookeeper
+     - broker-1
+     - broker-2
+    networks:
+      kafka-cluster-net:
+        ipv4_address: 10.5.0.8
+
+networks:
+  kafka-cluster-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.5.0.0/16
